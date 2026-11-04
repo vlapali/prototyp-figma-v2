@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="local_cafe">
+<mask id="mask0_0_564" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18">
+<rect id="Bounding box" width="18" height="18" fill="#D9D9D9"/>
+</mask>
+<g mask="url(#mask0_0_564)">
+<path id="local_cafe_2" d="M3 15.75V14.25H15V15.75H3ZM6 12.75C5.175 12.75 4.46875 12.4562 3.88125 11.8687C3.29375 11.2812 3 10.575 3 9.75V2.25H15C15.4125 2.25 15.7656 2.39687 16.0594 2.69063C16.3531 2.98438 16.5 3.3375 16.5 3.75V6C16.5 6.4125 16.3531 6.76562 16.0594 7.05937C15.7656 7.35312 15.4125 7.5 15 7.5H13.5V9.75C13.5 10.575 13.2062 11.2812 12.6187 11.8687C12.0312 12.4562 11.325 12.75 10.5 12.75H6ZM6 11.25H10.5C10.9125 11.25 11.2656 11.1031 11.5594 10.8094C11.8531 10.5156 12 10.1625 12 9.75V3.75H4.5V9.75C4.5 10.1625 4.64688 10.5156 4.94063 10.8094C5.23438 11.1031 5.5875 11.25 6 11.25ZM13.5 6H15V3.75H13.5V6ZM6 11.25H4.5H12H6Z" fill="#2D4E8D"/>
+</g>
+</g>
+</svg>
