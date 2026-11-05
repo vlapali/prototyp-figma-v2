@@ -327,11 +327,18 @@
 
   // ---------- homepage (Landing DS v2, 225:202) ----------
   const TABS = [
-    ['pomocnik', 'Cestovní pomocník', 'Popište, jaký pobyt hledáte, nebo vložte URL nabídky'],
-    ['hotely', 'Hotely', 'Naplánujte si u nás dovolenou.'],
-    ['auto', 'Pronájem vozu', ''],
-    ['zajezdy', 'Zájezdy', 'Kam chcete letět? Např. „moře v Řecku“'],
+    ['pomocnik', 'Cestovní pomocník', 'Popište dovolenou, třeba „týden u moře do 20 000 bodů“'],
+    ['hotely', 'Hotely', 'Kam chcete jet?'],
+    ['auto', 'Pronájem vozu', 'Kde si vůz vyzvednete? Město nebo letiště'],
+    ['zajezdy', 'Zájezdy', 'Kam chcete letět? Země nebo destinace'],
   ];
+  // pod polem: pomocník → návrhy dotazů, hotely / zájezdy → termín a osoby (Figma 224:1331)
+  const guestsMeta = () => `${S.adults} ${plural(S.adults, 'dospělý', 'dospělí', 'dospělých')} · ${S.kids} ${plural(S.kids, 'dítě', 'děti', 'dětí')}`;
+  const searchExtra = k => k === 'auto'
+    ? `<div class="search-meta"><button type="button" data-toast="Pronájem vozu není součástí prototypu.">${ic.cal}<span>Datum vyzvednutí a vrácení</span></button><button type="button" data-toast="Pronájem vozu není součástí prototypu.">${ic.guests}<span>Věk řidiče 30–65 let</span></button></div>`
+    : k === 'pomocnik'
+    ? `<div class="examples">${['Víkend na horách pro dva', 'Wellness do 10 000 bodů', 'Kam k moři v červnu?'].map(x => `<button type="button" data-ex="${x}">${x}</button>`).join('')}</div>`
+    : `<div class="search-meta"><button type="button" id="hDates">${ic.cal}<span>${S.datesTouched ? fmtRange() + ' · ' + nightsTxt(nights()) : k === 'zajezdy' ? 'Termín a délka pobytu' : 'Výběr termínu'}</span></button><button type="button" id="hGuests">${ic.guests}<span>${guestsMeta()} · ${k === 'zajezdy' ? 'Odlet z Prahy' : '1 pokoj'}</span></button></div>`;
   function viewHome() {
     header('hero');
     const M = window.HOME, F = FEATURED;  // F – první v karuselu a v populárních hotelech
@@ -343,7 +350,6 @@
       { city: 'Budapešť', country: 'Maďarsko', img: cover(byId('7seasons-apartments-budapest'), 0) },
       { city: 'Florencie', country: 'Itálie', img: cover(byId('numa-florence-vita'), 0) },
     ];
-    if (S.tab === 'auto') S.tab = 'hotely';
     const tab = TABS.find(t => t[0] === S.tab) || TABS[1];
     app.innerHTML = `
     <section class="hero">
@@ -351,9 +357,8 @@
         <h1>Nevíte, co s <em>benefit body</em>?</h1>
         <form class="search" id="search">
           <div class="tabs" role="tablist">${TABS.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab[0]}"${k === tab[0] ? ' class="on"' : ''}>${l}</button>`).join('')}</div>
-          <div class="search-box"><input id="q" placeholder="${esc(tab[2])}" aria-label="Hledat" autocomplete="off"></div>
-          <div class="search-meta"><button type="button" id="hDates">${ic.cal}<span>${S.datesTouched ? fmtRange() + ' · ' + nightsTxt(nights()) : 'Výběr termínu'}</span></button><button type="button" id="hGuests">${ic.guests}<span>${S.adults} ${plural(S.adults, 'dospělý', 'dospělí', 'dospělých')} · ${S.kids} ${plural(S.kids, 'dítě', 'děti', 'dětí')} · 1 pokoj</span></button></div>
-          <div class="examples">Zkuste: ${['wellness víkend v Česku', 'hory s dětmi', 'Florencie na 3 noci', 'mám 12 000 bodů'].map(x => `<button type="button" data-ex="${x}">${x}</button>`).join('')}</div>
+          <div class="search-box"><input id="q" placeholder="${esc(tab[2])}" aria-label="Hledat" autocomplete="off"><button type="button" class="mic" aria-label="Hlasové zadání" data-toast="Hlasové zadání není součástí prototypu.">${ic.mic}</button></div>
+          <div id="searchExtra">${searchExtra(tab[0])}</div>
         </form>
       </div>
       ${dockHtml(carousel)}
@@ -378,16 +383,20 @@
     </div></div>`;
     initDock(carousel.length);
     const submit = q => go('hledat', S.tab === 'zajezdy' ? { q, druh: 'trip' } : { q });
-    $('#search').onsubmit = e => { e.preventDefault(); submit($('#q').value); };
-    $$('[data-ex]').forEach(b => b.onclick = () => { $('#q').value = b.dataset.ex; submit(b.dataset.ex); });
+    $('#search').onsubmit = e => { e.preventDefault(); if (S.tab === 'auto') { toast('Pronájem vozu není součástí prototypu.'); return; } submit($('#q').value); };
+    const bindExtra = () => {
+      $$('[data-ex]').forEach(b => b.onclick = () => { $('#q').value = b.dataset.ex; submit(b.dataset.ex); });
+      if (!$('#hDates')) return;
+      $('#hDates').onclick = e => openPop(e.currentTarget, 'dates', () => { $('#hDates span').textContent = fmtRange() + ' · ' + nightsTxt(nights()); });
+      $('#hGuests').onclick = e => openPop(e.currentTarget, 'guests', () => { $('#hGuests span').textContent = `${guestsMeta()} · ${S.tab === 'zajezdy' ? 'Odlet z Prahy' : '1 pokoj'}`; });
+    };
+    bindExtra();
     $$('[data-tab]').forEach(b => b.onclick = () => {
-      if (b.dataset.tab === 'auto') { toast('Pronájem vozu není součástí prototypu.'); return; }
       S.tab = b.dataset.tab; save();
       $$('[data-tab]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b); });
-      $('#q').placeholder = TABS.find(t => t[0] === S.tab)[2]; $('#q').focus();
+      $('#q').placeholder = TABS.find(t => t[0] === S.tab)[2];
+      $('#searchExtra').innerHTML = searchExtra(S.tab); bindExtra(); $('#q').focus();
     });
-    $('#hDates').onclick = e => openPop(e.currentTarget, 'dates', () => { $('#hDates span').textContent = fmtRange() + ' · ' + nightsTxt(nights()); });
-    $('#hGuests').onclick = e => openPop(e.currentTarget, 'guests', () => { $('#hGuests span').textContent = `${S.adults} ${plural(S.adults, 'dospělý', 'dospělí', 'dospělých')} · ${S.kids} ${plural(S.kids, 'dítě', 'děti', 'dětí')} · 1 pokoj`; });
   }
 
   // ---------- nekonečný carousel (Dock) – Figma 183:2068 ----------
