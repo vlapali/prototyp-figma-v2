@@ -13,6 +13,14 @@
 
   const D = window.DATA, HOTELS = D.hotels, TRIPS = D.trips;
   const byId = id => HOTELS.find(h => h.id === id);
+  // Kapacita pokoje podle postelí (rozkládací pohovka i patrová postel = 2 os.). Booking archiv Svatého Vavřince
+  // má maxGuests = 2 jen proto, že se hledalo pro 2 osoby – ceny platí pro 2, pokoje ale pojmou víc.
+  const ROOM_CAP = { 'svv-1': 4, 'svv-2': 4, 'svv-3': 4, 'svv-4': 4, 'svv-5': 8, 'svv-6': 6, 'svv-7': 6, 'svv-8': 4, 'svv-9': 6, 'svv-10': 6, 'svv-11': 8 };
+  // t.base = obsazenost, pro kterou platí cena v datech; t.maxGuests = kapacita pokoje
+  for (const h of HOTELS) for (const r of h.rooms) {
+    r.maxGuests = Math.max(r.maxGuests, ROOM_CAP[r.id] || 0);
+    for (const t of r.rates) { t.base ??= t.maxGuests; t.maxGuests = Math.max(t.base, r.maxGuests); }
+  }
   const tripById = id => TRIPS.find(t => t.id === id);
   const FEATURED = HOTELS.find(h => h.featured);
   const FEE = 0.079;
@@ -76,20 +84,20 @@
   const guests = () => S.adults + S.kids;
 
   // ---------- ceny hotelů ----------
-  // Sazby v datech jsou za plnou obsazenost (maxGuests). Za každou osobu pod maximem −10 %, nejvýš −30 % (demo pravidlo).
+  // Sazba v datech platí pro t.base osob. Každá osoba navíc +10 %, každá méně −10 %, nejvýš ±30 % (demo pravidlo).
   const OCC_STEP = 0.1, OCC_MAX = 0.3;
-  const occFactor = (t, occ) => 1 - Math.min(OCC_MAX, OCC_STEP * Math.max(0, t.maxGuests - occ));
+  const occFactor = (t, occ) => 1 + Math.max(-OCC_MAX, Math.min(OCC_MAX, OCC_STEP * (occ - t.base)));
   const occPN = (t, occ) => t.perNight * occFactor(t, occ);
   // rozdělení hostů do k pokojů stejné sazby – plní se postupně, v každém pokoji aspoň 1 osoba
   const splitGuests = (g, max, k) => Array.from({ length: k }, (_, i) => Math.max(1, Math.min(max, g - max * i)));
   const ratePN = (t, k = 1, g = Math.max(1, guests())) => splitGuests(g, t.maxGuests, k).reduce((s, o) => s + occPN(t, o), 0);
-  const minPerNight = h => Math.min(...h.rooms.flatMap(r => r.rates.filter(t => t.maxGuests >= 2 || h.rooms.every(x => x.maxGuests < 2)).map(t => occPN(t, Math.min(Math.max(1, guests()), t.maxGuests)))));
+  const minPerNight = h => Math.min(...h.rooms.flatMap(r => r.rates.filter(t => t.base >= 2 || h.rooms.every(x => x.maxGuests < 2)).map(t => occPN(t, Math.min(Math.max(1, guests()), t.maxGuests)))));
   const fromStay = h => {
     // nejlevnější kombinace pro aktuální počet hostů (pokoje stejného typu)
     const g = Math.max(1, guests()), n = nights();
     let best = Infinity;
     for (const r of h.rooms) for (const t of r.rates) {
-      if (g >= 2 && t.maxGuests < 2) continue;
+      if (g >= 2 && t.base < 2) continue;
       const cnt = Math.ceil(g / t.maxGuests); best = Math.min(best, ratePN(t, cnt, g) * n);
     }
     return best;
@@ -100,8 +108,8 @@
     return room.rates.filter(t => {
       if (S.fBreak && !t.breakfast) return false;
       if (S.fFree && !t.refundable) return false;
-      if (guests() === 1) return t.maxGuests === 1 || !room.rates.some(x => x.maxGuests === 1 && x.breakfast === t.breakfast && x.refundable === t.refundable);
-      return t.maxGuests >= 2 || room.maxGuests === 1;
+      if (guests() === 1) return t.base === 1 || !room.rates.some(x => x.base === 1 && x.breakfast === t.breakfast && x.refundable === t.refundable);
+      return t.base >= 2 || room.maxGuests === 1;
     });
   }
 
@@ -577,7 +585,7 @@
   const RATING_LABEL = s => s >= 9.5 ? 'Naprosto výjimečné' : s >= 9 ? 'Fantastické' : s >= 8.5 ? 'Skvělé' : s >= 8 ? 'Velmi dobré' : 'Dobré';
   function cheapest(h) {
     const g = Math.max(1, guests()); let best = null;
-    for (const r of h.rooms) for (const t of r.rates) { if (g >= 2 && t.maxGuests < 2) continue; const v = ratePN(t, Math.ceil(g / t.maxGuests), g); if (!best || v < best.v) best = { v, r, t }; }
+    for (const r of h.rooms) for (const t of r.rates) { if (g >= 2 && t.base < 2) continue; const v = ratePN(t, Math.ceil(g / t.maxGuests), g); if (!best || v < best.v) best = { v, r, t }; }
     return best;
   }
   const resultHotel = h => {
@@ -708,7 +716,7 @@
       const thumbs = [1, 2, 3].map(k => h.photos[(ri + k) % h.photos.length]);
       return rates.map((t, i) => {
         const key = room.id + '|' + t.id, q = S.sel[key] || 0, until = cancelUntil(t);
-        const g = Math.max(1, guests()), occ = Math.min(g, t.maxGuests), need = Math.ceil(g / t.maxGuests), f = occFactor(t, occ), roomMax = Math.max(t.maxGuests, room.maxGuests);
+        const g = Math.max(1, guests()), occ = Math.min(g, t.maxGuests), need = Math.ceil(g / t.maxGuests), f = occFactor(t, occ), roomMax = t.maxGuests;
         const roomCell = i === 0 ? `<td class="room" rowspan="${rates.length}">
             <h4>${esc(room.name)}</h4>
             ${room.left ? `<div class="left">Zbývají jen ${room.left} ${plural(room.left, 'pokoj', 'pokoje', 'pokojů')}</div>` : ''}
