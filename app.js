@@ -76,14 +76,21 @@
   const guests = () => S.adults + S.kids;
 
   // ---------- ceny hotelů ----------
-  const minPerNight = h => Math.min(...h.rooms.flatMap(r => r.rates.filter(t => t.maxGuests >= 2 || h.rooms.every(x => x.maxGuests < 2)).map(t => t.perNight)));
+  // Sazby v datech jsou za plnou obsazenost (maxGuests). Za každou osobu pod maximem −10 %, nejvýš −30 % (demo pravidlo).
+  const OCC_STEP = 0.1, OCC_MAX = 0.3;
+  const occFactor = (t, occ) => 1 - Math.min(OCC_MAX, OCC_STEP * Math.max(0, t.maxGuests - occ));
+  const occPN = (t, occ) => t.perNight * occFactor(t, occ);
+  // rozdělení hostů do k pokojů stejné sazby – plní se postupně, v každém pokoji aspoň 1 osoba
+  const splitGuests = (g, max, k) => Array.from({ length: k }, (_, i) => Math.max(1, Math.min(max, g - max * i)));
+  const ratePN = (t, k = 1, g = Math.max(1, guests())) => splitGuests(g, t.maxGuests, k).reduce((s, o) => s + occPN(t, o), 0);
+  const minPerNight = h => Math.min(...h.rooms.flatMap(r => r.rates.filter(t => t.maxGuests >= 2 || h.rooms.every(x => x.maxGuests < 2)).map(t => occPN(t, Math.min(Math.max(1, guests()), t.maxGuests)))));
   const fromStay = h => {
     // nejlevnější kombinace pro aktuální počet hostů (pokoje stejného typu)
     const g = Math.max(1, guests()), n = nights();
     let best = Infinity;
     for (const r of h.rooms) for (const t of r.rates) {
       if (g >= 2 && t.maxGuests < 2) continue;
-      const cnt = Math.ceil(g / t.maxGuests); best = Math.min(best, t.perNight * n * cnt);
+      const cnt = Math.ceil(g / t.maxGuests); best = Math.min(best, ratePN(t, cnt, g) * n);
     }
     return best;
   };
@@ -98,17 +105,22 @@
     });
   }
 
-  function hotelTotals(h, sel, ci, co, adults) {
+  function hotelTotals(h, sel, ci, co, adults, g = adults) {
     const n = nightsOf(ci, co); let acc = 0, cap = 0, rooms = 0; const items = [];
     for (const [key, q] of Object.entries(sel || {})) {
       if (!q) continue;
       const [rid, tid] = key.split('|');
       const room = h.rooms.find(r => r.id === rid), rate = room?.rates.find(t => t.id === tid);
       if (!rate) continue;
-      const price = Math.round(rate.perNight * n) * q;
-      acc += price; cap += rate.maxGuests * q; rooms += q;
-      items.push({ room, rate, q, price });
+      items.push({ room, rate, q });
     }
+    // hosté se rozdělí nejdřív do největších pokojů; každý pokoj se pak platí podle své obsazenosti
+    let left = Math.max(1, g);
+    for (const i of [...items].sort((a, b) => b.rate.maxGuests - a.rate.maxGuests)) {
+      i.occ = Array.from({ length: i.q }, () => { const o = Math.max(1, Math.min(i.rate.maxGuests, left)); left -= o; return o; });
+      i.price = i.occ.reduce((s, o) => s + Math.round(occPN(i.rate, o) * n), 0);
+    }
+    for (const i of items) { acc += i.price; cap += i.rate.maxGuests * i.q; rooms += i.q; }
     const fee = Math.round(acc * FEE), cityTax = Math.round(h.cityTax * adults * n);
     return { n, acc, fee, cityTax, now: acc + fee, total: acc + fee + cityTax, cap, rooms, items };
   }
@@ -556,7 +568,7 @@
   const RATING_LABEL = s => s >= 9.5 ? 'Naprosto výjimečné' : s >= 9 ? 'Fantastické' : s >= 8.5 ? 'Skvělé' : s >= 8 ? 'Velmi dobré' : 'Dobré';
   function cheapest(h) {
     const g = Math.max(1, guests()); let best = null;
-    for (const r of h.rooms) for (const t of r.rates) { if (g >= 2 && t.maxGuests < 2) continue; const v = t.perNight * Math.ceil(g / t.maxGuests); if (!best || v < best.v) best = { v, r, t }; }
+    for (const r of h.rooms) for (const t of r.rates) { if (g >= 2 && t.maxGuests < 2) continue; const v = ratePN(t, Math.ceil(g / t.maxGuests), g); if (!best || v < best.v) best = { v, r, t }; }
     return best;
   }
   const resultHotel = h => {
@@ -687,6 +699,7 @@
       const thumbs = [1, 2, 3].map(k => h.photos[(ri + k) % h.photos.length]);
       return rates.map((t, i) => {
         const key = room.id + '|' + t.id, q = S.sel[key] || 0, until = cancelUntil(t);
+        const g = Math.max(1, guests()), occ = Math.min(g, t.maxGuests), need = Math.ceil(g / t.maxGuests), f = occFactor(t, occ);
         const roomCell = i === 0 ? `<td class="room" rowspan="${rates.length}">
             <h4>${esc(room.name)}</h4>
             ${room.left ? `<div class="left">Zbývají jen ${room.left} ${plural(room.left, 'pokoj', 'pokoje', 'pokojů')}</div>` : ''}
@@ -695,13 +708,14 @@
             <div class="feat">${room.facilities.slice(0, 6).map(f => `<span class="chip chip-sm">${esc(f)}</span>`).join('')}</div>
             ${room.description || room.facilities.length > 6 ? `<div class="more" hidden>${room.description ? `<p class="sm">${esc(room.description)}</p>` : ''}<div class="feat">${room.facilities.slice(6).map(f => `<span class="chip chip-sm">${esc(f)}</span>`).join('')}</div></div><button class="link" data-more>Zobrazit více</button>` : ''}</td>` : '';
         return `<tr class="rate${i === 0 ? ' first' : ''}">${roomCell}
-          <td class="persons" title="Max. ${t.maxGuests} ${plural(t.maxGuests, 'osoba', 'osoby', 'osob')}">${ic.person.repeat(t.maxGuests)}</td>
-          <td class="price-cell">${t.origPerNight ? `<s class="muted xs">${kc(t.origPerNight * n)}</s><br>` : ''}${kc(Math.round(t.perNight * n))}<span class="xs muted" style="display:block;font-weight:400">${nightsTxt(n)}</span></td>
+          <td class="persons" title="Cena pro ${occ} ${plural(occ, 'osobu', 'osoby', 'osob')} · max. ${t.maxGuests}"><span class="figs">${ic.person.repeat(occ)}<span class="ghost">${ic.person.repeat(t.maxGuests - occ)}</span></span>
+            <span class="cap">${need > 1 ? `max. ${t.maxGuests} · pro ${g} os. ${need} ${plural(need, 'pokoj', 'pokoje', 'pokojů')}` : occ < t.maxGuests ? `max. ${t.maxGuests}` : ''}</span></td>
+          <td class="price-cell">${t.origPerNight ? `<s class="muted xs">${kc(Math.round(t.origPerNight * f * n))}</s><br>` : ''}${kc(Math.round(occPN(t, occ) * n))}<span class="xs muted" style="display:block;font-weight:400">${nightsTxt(n)} · ${occ} ${plural(occ, 'osoba', 'osoby', 'osob')}</span></td>
           <td><div class="opts">
-            <div class="opt${t.breakfast ? ' ok' : ''}">${ic.cup}<span>${t.breakfast ? 'Snídaně v ceně' : t.breakfastPrice ? `Snídaně ${t.breakfastPrice} Kč` : 'Bez snídaně'}</span></div>
+            <div class="opt${t.breakfast ? ' ok' : ''}">${ic.cup}<span>${t.breakfast ? 'Snídaně v ceně' : t.breakfastPrice ? `Snídaně ${t.breakfastPrice} Kč / os. / noc<span class="until">${kc(t.breakfastPrice * occ * n)} celkem, platí se zvlášť</span>` : 'Bez snídaně'}</span></div>
             ${t.refundable ? `<div class="opt ok">${ic.check}<span>Zrušení zdarma${until ? `<span class="until">do ${until}</span>` : ''}</span></div>` : `<div class="opt">${ic.x}<span>Nevratná rezervace</span></div>`}
           </div></td>
-          <td><select class="qty" data-key="${key}" aria-label="Počet pokojů">${Array.from({ length: Math.min(room.left || 5, 5) + 1 }, (_, k) => `<option value="${k}"${k === q ? ' selected' : ''}>${k}${k ? ` (${kc(Math.round(t.perNight * n) * k)})` : ''}</option>`).join('')}</select></td>
+          <td><select class="qty" data-key="${key}" aria-label="Počet pokojů">${Array.from({ length: Math.min(room.left || 5, 5) + 1 }, (_, k) => `<option value="${k}"${k === q ? ' selected' : ''}>${k}${k ? ` (${kc(Math.round(ratePN(t, k, g) * n))})` : ''}</option>`).join('')}</select></td>
         </tr>`;
       }).join('');
     }).join('');
@@ -713,11 +727,11 @@
   }
 
   function drawSummary(h) {
-    const t = hotelTotals(h, S.sel, S.checkIn, S.checkOut, S.adults), g = guests(), el = $('#sum');
+    const t = hotelTotals(h, S.sel, S.checkIn, S.checkOut, S.adults, guests()), g = guests(), el = $('#sum');
     const short = t.rooms && t.cap < g;
     el.innerHTML = `<h4>Vaše rezervace</h4>
       <div class="xs muted" style="margin-top:6px">${fmtRange()} · ${nightsTxt(t.n)} · ${guestsTxt()}</div>
-      ${t.rooms ? `<div class="lines">${t.items.map(i => `<div><span>${i.q}× ${esc(i.room.name)}${i.rate.breakfast ? ' · se snídaní' : ''}</span><span>${kc(i.price)}</span></div>`).join('')}</div>`
+      ${t.rooms ? `<div class="lines">${t.items.map(i => `<div><span>${i.q}× ${esc(i.room.name)} · ${i.occ.join(' + ')} os.${i.rate.breakfast ? ' · se snídaní' : ''}</span><span>${kc(i.price)}</span></div>`).join('')}</div>`
         : `<p class="sm" style="margin:16px 0">Prosím nejprve zvolte ubytování</p>`}
       ${short ? `<p class="warn">Vybrané pokoje pojmou ${t.cap} ${plural(t.cap, 'osobu', 'osoby', 'osob')} z ${g}. Přidejte pokoj.</p>` : ''}
       <div class="tot"><span>Celkem</span><b>${kc(t.acc)}</b></div>
@@ -793,13 +807,13 @@
     const c = S.cart; if (!c) return null;
     if (c.kind === 'hotel') {
       const h = byId(c.id); if (!h) return null;
-      const t = hotelTotals(h, c.sel, c.checkIn, c.checkOut, c.adults);
+      const t = hotelTotals(h, c.sel, c.checkIn, c.checkOut, c.adults, c.adults + (c.kids || 0));
       if (!t.rooms) return null;
       const refundable = t.items.every(i => i.rate.refundable);
       return {
         x: h, photo: cover(h), name: h.name, stars: h.stars, address: h.address, promo: h.promo,
         rows: [['Příjezd', fmtD(c.checkIn)], ['Odjezd', fmtD(c.checkOut)], ['Délka pobytu', nightsTxt(t.n)], ['Počet osob', guestsTxt(c.adults, c.kids)]],
-        lines: t.items.map(i => [`${i.q}× ${i.room.name}${i.rate.breakfast ? ', snídaně' : ''}`, kc(i.price)]),
+        lines: t.items.map(i => [`${i.q}× ${i.room.name} (${i.occ.join(' + ')} os.)${i.rate.breakfast ? ', snídaně' : ''}`, kc(i.price)]),
         acc: t.acc, fee: t.fee, now: t.now, atPlace: t.cityTax, atPlaceLabel: 'Městský poplatek', back: href('hotel', {}, h.id),
         cancel: refundable ? `Zrušení zdarma do ${cancelUntil(t.items[0].rate, c.checkIn)}` : 'Nevratná rezervace', refundable,
         summary: t.items.map(i => `${i.q}× ${i.room.name}`).join(', '), dates: fmtRange(c.checkIn, c.checkOut), guests: guestsTxt(c.adults, c.kids),
