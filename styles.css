@@ -140,7 +140,7 @@ button.chip:hover, a.chip:hover { border-color: var(--border-strong); }
 .dock-img img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; transition: transform .3s; }
 .dock-tile:hover .dock-img img { transform: scale(1.04); }
 .dock-txt { display: grid; gap: 2px; line-height: 1.4; }
-.dock-txt b { font-weight: 600; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: font-size .45s; }
+.dock-txt b { font-weight: 600; font-size: 14px; min-height: 2.8em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: font-size .45s; }
 .dock-txt span { font-size: 12px; white-space: nowrap; transition: font-size .45s; color: rgba(255,255,255,.85); }
 .dock-txt em { font-style: normal; font-weight: 600; color: var(--sunset-400); }
 .dock-tile.s2 .dock-txt span, .dock-tile.s1 .dock-txt span { font-size: 14px; }

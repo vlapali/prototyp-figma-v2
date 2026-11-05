@@ -699,7 +699,7 @@
       const thumbs = [1, 2, 3].map(k => h.photos[(ri + k) % h.photos.length]);
       return rates.map((t, i) => {
         const key = room.id + '|' + t.id, q = S.sel[key] || 0, until = cancelUntil(t);
-        const g = Math.max(1, guests()), occ = Math.min(g, t.maxGuests), need = Math.ceil(g / t.maxGuests), f = occFactor(t, occ);
+        const g = Math.max(1, guests()), occ = Math.min(g, t.maxGuests), need = Math.ceil(g / t.maxGuests), f = occFactor(t, occ), roomMax = Math.max(t.maxGuests, room.maxGuests);
         const roomCell = i === 0 ? `<td class="room" rowspan="${rates.length}">
             <h4>${esc(room.name)}</h4>
             ${room.left ? `<div class="left">Zbývají jen ${room.left} ${plural(room.left, 'pokoj', 'pokoje', 'pokojů')}</div>` : ''}
@@ -708,8 +708,8 @@
             <div class="feat">${room.facilities.slice(0, 6).map(f => `<span class="chip chip-sm">${esc(f)}</span>`).join('')}</div>
             ${room.description || room.facilities.length > 6 ? `<div class="more" hidden>${room.description ? `<p class="sm">${esc(room.description)}</p>` : ''}<div class="feat">${room.facilities.slice(6).map(f => `<span class="chip chip-sm">${esc(f)}</span>`).join('')}</div></div><button class="link" data-more>Zobrazit více</button>` : ''}</td>` : '';
         return `<tr class="rate${i === 0 ? ' first' : ''}">${roomCell}
-          <td class="persons" title="Cena pro ${occ} ${plural(occ, 'osobu', 'osoby', 'osob')} · max. ${t.maxGuests}"><span class="figs">${ic.person.repeat(occ)}<span class="ghost">${ic.person.repeat(t.maxGuests - occ)}</span></span>
-            <span class="cap">${need > 1 ? `max. ${t.maxGuests} · pro ${g} os. ${need} ${plural(need, 'pokoj', 'pokoje', 'pokojů')}` : occ < t.maxGuests ? `max. ${t.maxGuests}` : ''}</span></td>
+          <td class="persons" title="Cena pro ${occ} ${plural(occ, 'osobu', 'osoby', 'osob')} · max. ${roomMax}"><span class="figs">${ic.person.repeat(occ)}<span class="ghost">${ic.person.repeat(roomMax - occ)}</span></span>
+            <span class="cap">${need > 1 ? `max. ${t.maxGuests} · pro ${g} os. ${need} ${plural(need, 'pokoj', 'pokoje', 'pokojů')}` : occ < roomMax ? `max. ${roomMax}` : ''}</span></td>
           <td class="price-cell">${t.origPerNight ? `<s class="muted xs">${kc(Math.round(t.origPerNight * f * n))}</s><br>` : ''}${kc(Math.round(occPN(t, occ) * n))}<span class="xs muted" style="display:block;font-weight:400">${nightsTxt(n)} · ${occ} ${plural(occ, 'osoba', 'osoby', 'osob')}</span></td>
           <td><div class="opts">
             <div class="opt${t.breakfast ? ' ok' : ''}">${ic.cup}<span>${t.breakfast ? 'Snídaně v ceně' : t.breakfastPrice ? `Snídaně ${t.breakfastPrice} Kč / os. / noc<span class="until">${kc(t.breakfastPrice * occ * n)} celkem, platí se zvlášť</span>` : 'Bez snídaně'}</span></div>
