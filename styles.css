@@ -117,10 +117,9 @@ button.chip:hover, a.chip:hover { border-color: var(--border-strong); }
 .tabs button.on { font-weight: 600; border-bottom-color: #fff; }
 .tabs button:not(.on):hover { color: var(--text-accent-on-dark); }
 .search-box { position: relative; padding: 2px; border-radius: var(--r-full); background: linear-gradient(90deg, #F26A9A, #F2B01E 35%, #7FD9A8 70%, #2F6BFF); }
-.search-box input { width: 100%; height: 60px; border: 0; border-radius: var(--r-full); padding: 0 120px 0 24px; font: inherit; font-size: 18px; color: var(--text-primary); background: #fff; }
+.search-box input { width: 100%; height: 60px; border: 0; border-radius: var(--r-full); padding: 0 24px; font: inherit; font-size: 18px; color: var(--text-primary); background: #fff; }
 .search-box input::placeholder { color: var(--text-secondary); }
 .search-box input:focus { outline: none; }
-.search-box .go { position: absolute; right: 8px; top: 8px; }
 .search-meta { display: flex; gap: 24px; margin-top: 16px; padding-left: 24px; font-size: 14px; flex-wrap: wrap; }
 .search-meta button { background: none; border: 0; color: #fff; display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; }
 .search-meta button:hover span { text-decoration: underline; }
@@ -130,7 +129,7 @@ button.chip:hover, a.chip:hover { border-color: var(--border-strong); }
 .examples button:hover { background: rgba(255,255,255,.2); }
 
 /* Nekonečný carousel s Dock efektem */
-.dock { position: relative; height: 250px; margin-top: 44px; overflow: hidden; outline: none; touch-action: pan-y; user-select: none; }
+.dock { position: relative; height: 250px; margin-top: 44px; overflow: hidden; outline: none; touch-action: pan-y; overscroll-behavior-x: contain; user-select: none; }
 .dock:focus-visible { outline: 2px solid var(--text-accent-on-dark); outline-offset: -2px; }
 .dock-track { position: absolute; inset: 0 auto 0 0; display: flex; align-items: center; gap: 16px; transition: transform .45s cubic-bezier(.22,.61,.36,1); will-change: transform; }
 .dock-track.noanim, .dock-track.noanim .dock-tile, .dock-track.noanim .dock-txt * { transition: none !important; }
@@ -534,7 +533,6 @@ textarea.inp { height: auto; min-height: 76px; padding: 12px 14px; resize: verti
   .sbar label { padding: 6px 0; }
   .sbar .sub { padding-left: 8px; }
   .search-box input { height: 52px; font-size: 16px; padding-right: 16px; }
-  .search-box .go { display: none; }
   .search-meta, .examples { padding-left: 4px; }
   .sec { padding: 28px 0; }
   .steps, .form, .reviews .qs { grid-template-columns: 1fr; }

@@ -339,7 +339,7 @@
         <h1>Nevíte, co s <em>benefit body</em>?</h1>
         <form class="search" id="search">
           <div class="tabs" role="tablist">${TABS.map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === tab[0]}"${k === tab[0] ? ' class="on"' : ''}>${l}</button>`).join('')}</div>
-          <div class="search-box"><input id="q" placeholder="${esc(tab[2])}" aria-label="Hledat" autocomplete="off"><button class="btn btn-secondary btn-sm go">Hledat</button></div>
+          <div class="search-box"><input id="q" placeholder="${esc(tab[2])}" aria-label="Hledat" autocomplete="off"></div>
           <div class="search-meta"><button type="button" id="hDates">${ic.cal}<span>${S.datesTouched ? fmtRange() + ' · ' + nightsTxt(nights()) : 'Výběr termínu'}</span></button><button type="button" id="hGuests">${ic.guests}<span>${S.adults} ${plural(S.adults, 'dospělý', 'dospělí', 'dospělých')} · ${S.kids} ${plural(S.kids, 'dítě', 'děti', 'dětí')} · 1 pokoj</span></button></div>
           <div class="examples">Zkuste: ${['wellness víkend v Česku', 'hory s dětmi', 'Florencie na 3 noci', 'mám 12 000 bodů'].map(x => `<button type="button" data-ex="${x}">${x}</button>`).join('')}</div>
         </form>
@@ -441,6 +441,16 @@
       if (Math.abs(dx) > 40) move(dx < 0 ? Math.min(3, Math.round(-dx / 160) || 1) : -Math.min(3, Math.round(dx / 160) || 1));
     });
     dock.addEventListener('click', e => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
+
+    // horizontální scroll (trackpad, Shift + kolečko) – po kroku krátká pauza, ať setrvačnost nepřeskočí půl seznamu
+    let acc = 0, lock = 0;
+    dock.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      if (performance.now() < lock) { acc = 0; return; }
+      acc += e.deltaX;
+      if (Math.abs(acc) >= 60) { move(acc > 0 ? 1 : -1); acc = 0; lock = performance.now() + 220; }
+    }, { passive: false });
 
     // autoplay – pauza při najetí, fokusu a skrytém panelu
     dock.addEventListener('mouseenter', () => paused = true);
